@@ -4,7 +4,15 @@ const config: CapacitorConfig = {
   appId: 'cn.poems.flower',
   appName: '筱筱飞花',
   webDir: 'dist',
-  bundledWebRuntime: false
+  bundledWebRuntime: false,
+  plugins: {
+    CapacitorHttp: {
+      enabled: true
+    }
+  },
+  server: {
+    cleartext: true
+  }
 };
 
 export default config;

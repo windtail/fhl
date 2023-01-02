@@ -9,6 +9,7 @@ specifiers:
   '@capacitor/filesystem': ^4.1.4
   '@capacitor/haptics': 4.1.0
   '@capacitor/keyboard': 4.1.1
+  '@capacitor/preferences': ^4.0.2
   '@capacitor/status-bar': 4.1.1
   '@ionic/vue': ^6.0.0
   '@ionic/vue-router': ^6.0.0
@@ -51,6 +52,7 @@ dependencies:
   '@capacitor/filesystem': 4.1.4_@capacitor+core@4.6.2
   '@capacitor/haptics': 4.1.0_@capacitor+core@4.6.2
   '@capacitor/keyboard': 4.1.1_@capacitor+core@4.6.2
+  '@capacitor/preferences': 4.0.2_@capacitor+core@4.6.2
   '@capacitor/status-bar': 4.1.1_@capacitor+core@4.6.2
   '@ionic/vue': 6.5.1
   '@ionic/vue-router': 6.5.1
@@ -1527,6 +1529,14 @@ packages:
 
   /@capacitor/keyboard/4.1.1_@capacitor+core@4.6.2:
     resolution: {integrity: sha512-fdC7u2TeG4BqwC0LnPnhOdya31C4QKdhk/8pc5lxI9X5jyYAetMCN1kEkKa7KREw4DdzXotJt27B9BXxAza6og==}
+    peerDependencies:
+      '@capacitor/core': ^4.0.0
+    dependencies:
+      '@capacitor/core': 4.6.2
+    dev: false
+
+  /@capacitor/preferences/4.0.2_@capacitor+core@4.6.2:
+    resolution: {integrity: sha512-HgcRkMdVHSIV3TeQLZFmCaCeMWQ25wLyZZ7dA2f8Rw81Q1Nroxsi7HxTEGNqrWKSN9PNKBJD8vChr6eB2GNtZg==}
     peerDependencies:
       '@capacitor/core': ^4.0.0
     dependencies:

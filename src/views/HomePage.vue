@@ -34,6 +34,10 @@
             <ion-icon :icon="exitOutline" slot="start"></ion-icon>
             导出
           </ion-item>
+          <ion-item button :detail=false @click="configImportExport">
+            <ion-icon :icon="settingsOutline" slot="start"></ion-icon>
+            导入导出设置
+          </ion-item>
         </ion-item-group>
       </ion-list>
     </ion-content>
@@ -66,7 +70,7 @@
             <ion-label button @click="onPoemClick(poem)">
               {{ poem.no }}. {{ poem.title }} ({{ poem.dynasty }} {{ poem.author }})
               <template v-if="search.keys">
-                <br />
+                <br/>
                 <span v-html="poem.searchPreview"></span>
               </template>
             </ion-label>
@@ -123,6 +127,7 @@ import {
   modalController,
   toastController,
   loadingController,
+  alertController,
 } from '@ionic/vue';
 import {ref, watch} from 'vue';
 import {
@@ -131,11 +136,12 @@ import {
   exitOutline,
   pencil,
   searchOutline,
+  settingsOutline,
   star,
   starOutline,
   trash
 } from 'ionicons/icons';
-import {Directory, Encoding, Filesystem} from '@capacitor/filesystem';
+import {Preferences} from '@capacitor/preferences';
 
 import PoemModal from '@/components/PoemModal.vue';
 import PoemDetailModal from "@/components/PoemDetailModal.vue";
@@ -145,10 +151,11 @@ import {UserPoem} from "@/types/userpoem.types";
 import {Poem} from '@/entity/Poem'
 import PoemDataSource from '@/data-source';
 import sqliteConnection from '@/database';
-import {Capacitor} from '@capacitor/core';
+import {Capacitor, HttpResponse} from '@capacitor/core';
 import AdvanceSearchModal from "@/components/AdvanceSearchModal.vue";
 import {ObjectLiteral} from "typeorm";
 import {Segment} from "@/entity/Segment";
+import {CapacitorHttp} from '@capacitor/core';
 
 const mainList = ref(null)
 
@@ -309,19 +316,26 @@ async function msg(message: string, duration = 1500) {
   await toast.present();
 }
 
-const IMPORT_EXPORT_PATH = 'poems.json'
+class ImportExportUrl {
+  static KEY = "io-url"
+
+  static async get(): Promise<string> {
+    const result = await Preferences.get({key: ImportExportUrl.KEY})
+    return result.value || "http://192.168.1.100:8000/poems.json"
+  }
+
+  static async set(val: string) {
+    await Preferences.set({key: ImportExportUrl.KEY, value: val})
+  }
+}
 
 async function importPoems() {
   await menuController.close()
-
-  const result = await Filesystem.getUri({
-    path: IMPORT_EXPORT_PATH,
-    directory: Directory.External,
-  });
+  const url = await ImportExportUrl.get()
 
   const actionSheet = await actionSheetController.create({
     header: '导入将删除所有诗词，是否继续？',
-    subHeader: `将从 ${result.uri} 导入`,
+    subHeader: `将从 ${url} 导入`,
     buttons: [
       {
         text: '导入',
@@ -346,14 +360,17 @@ async function importPoems() {
     return
   }
 
+  const loading = await loadingController.create({
+    message: '正在导入...',
+  });
+  await loading.present();
+
   try {
-    const content = await Filesystem.readFile({
-      path: IMPORT_EXPORT_PATH,
-      directory: Directory.External,
-      encoding: Encoding.UTF8,
+    const response: HttpResponse = await CapacitorHttp.get({
+      url
     });
 
-    const userPoems = JSON.parse(content.data) as UserPoem[]
+    const userPoems = response.data as UserPoem[]
     const poemRepository = PoemDataSource.getRepository(Poem)
     await poemRepository.clear()
 
@@ -364,23 +381,21 @@ async function importPoems() {
 
     await persist()
 
+    await loading.dismiss()
     await msg(`导入成功`)
   } catch (e) {
+    await loading.dismiss()
     await msg(`导入失败：${e}`)
   }
 }
 
 async function exportPoems() {
   await menuController.close()
-
-  const result = await Filesystem.getUri({
-    path: IMPORT_EXPORT_PATH,
-    directory: Directory.External,
-  });
+  const url = await ImportExportUrl.get()
 
   const actionSheet = await actionSheetController.create({
     header: '即将导出，是否继续？',
-    subHeader: `将导出到 ${result.uri}`,
+    subHeader: `将导出到 ${url}`,
     buttons: [
       {
         text: '导出',
@@ -405,18 +420,62 @@ async function exportPoems() {
     return
   }
 
+  const loading = await loadingController.create({
+    message: '正在导出...',
+  });
+  await loading.present();
+
   const poems = await Poem.find()
   const userPoems = poems.map(poem => poem.toUserPoem())
 
-  await Filesystem.writeFile({
-    path: IMPORT_EXPORT_PATH,
-    data: JSON.stringify(userPoems),
-    directory: Directory.External,
-    encoding: Encoding.UTF8,
-    recursive: true,
-  })
+  try {
+    await CapacitorHttp.put({
+      url,
+      data: userPoems,
+      headers: {
+        "Content-Type": "application/json"
+      }
+    });
 
-  await msg('导出成功')
+    loading.dismiss()
+    await msg('导出成功')
+  } catch (e) {
+    loading.dismiss()
+    await msg(`导出失败：${e}`)
+  }
+}
+
+async function configImportExport() {
+  const url = await ImportExportUrl.get()
+
+  const alert = await alertController.create({
+    header: '请设置导入导出URL',
+    buttons: [
+      {
+        text: '确定',
+        role: 'destructive',
+      },
+      {
+        text: '取消',
+        role: 'cancel',
+      }
+    ],
+    inputs: [
+      {
+        placeholder: 'URL',
+        type: "url",
+        value: url,
+      }
+    ],
+  });
+
+  await alert.present();
+  const {role, data} = await alert.onDidDismiss();
+  if (role !== 'destructive') {
+    return
+  }
+
+  await ImportExportUrl.set(data.values[0])
 }
 
 async function onPoemClick(poem: Poem) {
