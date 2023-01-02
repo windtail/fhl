@@ -61,7 +61,7 @@
       <!-- 主要内容 -->
       <ion-list ref="mainList">
 
-        <ion-item-sliding v-for="poem in poems" :key="poem.id">
+        <ion-item-sliding v-for="(poem, index) in poems" :key="poem.id">
           <ion-item>
             <ion-label button @click="onPoemClick(poem)">
               {{ poem.no }}. {{ poem.title }} ({{ poem.dynasty }} {{ poem.author }})
@@ -79,7 +79,7 @@
 
           <ion-item-options>
 
-            <ion-item-option color="danger" @click="onPoemDeleteClick(poem)">
+            <ion-item-option color="danger" @click="onPoemDeleteClick(index, poem)">
               <ion-icon :icon="trash" slot="start"/>
               删除
             </ion-item-option>
@@ -165,13 +165,19 @@ watch(userSearch, () => {
   }
 })
 
-async function persist() {
+async function persist(refreshMode: "always" | "if-searching" | "never" = "always") {
   const platform = Capacitor.getPlatform()
   if (platform === 'web') {
     await sqliteConnection.saveToStore(PoemDataSource.options.database as string);
   }
 
-  refresh.value += 1
+  if (refreshMode == "always") {
+    refresh.value += 1
+  } else if (refreshMode == "if-searching") {
+    if (!search.value.empty) {
+      refresh.value += 1
+    }
+  }
 }
 
 watch([favorOnly, search, refresh], async () => {
@@ -426,7 +432,7 @@ async function onPoemClick(poem: Poem) {
   await modal.onWillDismiss();
 }
 
-async function onPoemDeleteClick(poem: Poem) {
+async function onPoemDeleteClick(index: number, poem: Poem) {
   await mainList.value.$el.closeSlidingItems()
 
   const actionSheet = await actionSheetController.create({
@@ -455,7 +461,8 @@ async function onPoemDeleteClick(poem: Poem) {
   const {role} = await actionSheet.onDidDismiss();
   if (role === 'destructive') {
     await poem.remove()
-    await persist()
+    poems.value.splice(index, 1)
+    await persist("never")
   }
 }
 
@@ -475,10 +482,7 @@ async function onPoemEditClick(poem: Poem) {
   const {data, role} = await modal.onWillDismiss();
 
   if (role === 'confirm') {
-    const editedPoem = data as Poem
-
-    editedPoem.id = poem.id
-    editedPoem.favor = poem.favor
+    poem.syncFromEdited(data as Poem)
 
     await PoemDataSource
         .getRepository(Segment)
@@ -488,16 +492,16 @@ async function onPoemEditClick(poem: Poem) {
         .where("segment.poemId = :poemId", {poemId: poem.id})
         .execute()
 
-    editedPoem.generateSegments()
-    await editedPoem.save()
-    await persist()
+    poem.generateSegments()
+    await poem.save()
+    await persist("if-searching") // 编辑后可能不再匹配搜索
   }
 }
 
 async function onPoemToggleFavorClick(poem: Poem) {
   poem.favor = !poem.favor
   await poem.save()
-  await persist()
+  await persist("never")
 }
 
 </script>

@@ -79,6 +79,14 @@ export class Poem extends BaseEntity {
         }
     }
 
+    syncFromEdited(editedPoem: Poem) {
+        this.no = editedPoem.no
+        this.title = editedPoem.title
+        this.dynasty = editedPoem.dynasty
+        this.author = editedPoem.author
+        this.content = editedPoem.content
+    }
+
     static fromUserPoem(userPoem: UserPoem): Poem {
         const poem = new Poem()
 
