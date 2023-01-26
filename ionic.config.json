@@ -1,0 +1,7 @@
+{
+  "name": "fhl",
+  "integrations": {
+    "capacitor": {}
+  },
+  "type": "vue"
+}
