@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">筱筱飞花</string>
+    <string name="title_activity_main">筱筱飞花</string>
+    <string name="package_name">cn.poems.flower</string>
+    <string name="custom_url_scheme">cn.poems.flower</string>
+</resources>
