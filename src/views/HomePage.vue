@@ -31,7 +31,7 @@
         </ion-buttons>
 
         <ion-searchbar :debounce="500" placeholder="搜索"
-          @ion-change="search = Search.fromString($event.target.value!)"></ion-searchbar>
+                       @ion-change="search = Search.fromString($event.target.value!)"></ion-searchbar>
 
         <ion-buttons slot="end">
           <ion-button fill="clear" shape="round" @click="favorOnly = !favorOnly">
@@ -46,14 +46,14 @@
       <!-- 主要内容 -->
       <ion-list>
 
-        <ion-item-sliding v-for="poem in filteredPoems" :key="poem.id">
+        <ion-item-sliding v-for="poem in poems" :key="poem.id">
           <ion-item>
             <ion-label button @click="onPoemClick(poem)">
               {{ poem.no }}. {{ poem.title }} ({{ poem.dynasty }} {{ poem.author }})
             </ion-label>
             <ion-buttons slot="end">
               <ion-button @click="onPoemToggleFavorClick(poem)">
-                <ion-icon :icon="poem.favor ? star : starOutline" slot="icon-only" />
+                <ion-icon :icon="poem.favor ? star : starOutline" slot="icon-only"/>
               </ion-button>
             </ion-buttons>
           </ion-item>
@@ -61,12 +61,12 @@
           <ion-item-options>
 
             <ion-item-option color="danger" @click="onPoemDeleteClick(poem)">
-              <ion-icon :icon="trash" slot="start" />
+              <ion-icon :icon="trash" slot="start"/>
               删除
             </ion-item-option>
 
             <ion-item-option @click="onPoemEditClick(poem)">
-              <ion-icon :icon="pencil" slot="start" />
+              <ion-icon :icon="pencil" slot="start"/>
               编辑
             </ion-item-option>
 
@@ -101,60 +101,75 @@ import {
   actionSheetController,
   menuController,
 } from '@ionic/vue';
-import { ref, computed } from 'vue';
-import { trash, add, pencil, enter, exit, star, starOutline } from 'ionicons/icons';
+import {ref, watch} from 'vue';
+import {trash, add, pencil, enter, exit, star, starOutline} from 'ionicons/icons';
 
 import PoemModal from '@/components/PoemModal.vue';
-import { Poem, Search } from '@/types/poem.types';
+import {Search} from '@/types/poem.types';
+import {Poem} from '@/entity/Poem'
+import PoemDataSource from '@/data-source';
+import sqliteConnection from '@/database';
+import {Capacitor} from '@capacitor/core';
 
-
-const poems = ref<Poem[]>([
-  {
-    id: 0,
-    no: 1,
-    title: "静夜思",
-    dynasty: "唐代",
-    author: "李白",
-    content: "测试测试测试",
-    favor: false
-  },
-  {
-    id: 0,
-    no: 2,
-    title: "静夜思2",
-    dynasty: "唐代",
-    author: "李白",
-    content: "测试测试测试",
-    favor: true,
-  },
-])
+const poems = ref<Poem[]>([])
 
 const favorOnly = ref<boolean>(false)
 const search = ref<Search>(new Search())
+const refresh = ref(0)
 
-const filteredPoems = computed(() => {
-  if (search.value.empty()) {
-    return poems.value.filter(poem => {
-      if (favorOnly.value) {
-        if (!poem.favor) {
-          return false
-        }
-      }
-
-      return true
-    })
-  } else {
-    return poems.value.filter(poem => {
-      if (favorOnly.value) {
-        if (!poem.favor) {
-          return false
-        }
-      }
-
-      return search.value.match(poem)
-    })
+async function persist() {
+  const platform = Capacitor.getPlatform()
+  if (platform === 'web') {
+    await sqliteConnection.saveToStore(PoemDataSource.options.database as string);
   }
+
+  refresh.value += 1
+}
+
+watch([favorOnly, search, refresh], async () => {
+  const q = PoemDataSource.getRepository(Poem).createQueryBuilder('poem')
+  if (favorOnly.value) {
+    q.where('poem.favor = :favor', {favor: 1})
+  }
+
+  const {no, title, dynasty, author, keys} = search.value
+  if (no) {
+    q.where('poem.no = :no', {no})
+  }
+
+  if (title) {
+    q.where('poem.title LIKE %:title%', {title})
+  }
+
+  if (dynasty) {
+    q.where('poem.dynasty LIKE %:dynasty%', {dynasty})
+  }
+
+  if (author) {
+    q.where('poem.author LIKE %:author%', {author})
+  }
+
+  if (keys) {
+    for (const [index, key] of keys.entries()) {
+      const name = `key${index}`
+      const params: any = {}
+      params[name] = key
+      q.where(`poem.author LIKE %:${name}%`, params)
+    }
+  }
+
+  poems.value = await q.getMany()
+}, {
+  immediate: true
 })
+
+async function getNextNo(): Promise<number> {
+  const query = PoemDataSource.getRepository(Poem).createQueryBuilder('poem');
+  query.select("MAX(poem.no)", "max");
+  const result = await query.getRawOne();
+  const no = result ? result.max : 0;
+  return no + 1;
+}
 
 async function addPoem() {
   await menuController.close()
@@ -168,11 +183,16 @@ async function addPoem() {
   });
   modal.present();
 
-  const { data, role } = await modal.onWillDismiss();
+  const {data, role} = await modal.onWillDismiss();
 
   if (role === 'confirm') {
-    // TODO add
-    console.log("add", data)
+    const poem = data as Poem
+    if (poem.no == 0) {
+      poem.no = await getNextNo()
+    }
+
+    await poem.save()
+    await persist()
   }
 }
 
@@ -212,10 +232,10 @@ async function onPoemDeleteClick(poem: Poem) {
 
   await actionSheet.present();
 
-  const { role } = await actionSheet.onDidDismiss();
+  const {role} = await actionSheet.onDidDismiss();
   if (role === 'destructive') {
-    // TODO delete poem
-    console.log("delete", poem)
+    await poem.remove()
+    await persist()
   }
 }
 
@@ -230,18 +250,23 @@ async function onPoemEditClick(poem: Poem) {
   });
   modal.present();
 
-  const { data, role } = await modal.onWillDismiss();
+  const {data, role} = await modal.onWillDismiss();
 
   if (role === 'confirm') {
-    // TODO save changes
-    console.log("old", poem)
-    console.log("new", data)
+    const editedPoem = data as Poem
+
+    editedPoem.id = poem.id
+    editedPoem.favor = poem.favor
+
+    await editedPoem.save()
+    await persist()
   }
 }
 
-function onPoemToggleFavorClick(poem: Poem) {
+async function onPoemToggleFavorClick(poem: Poem) {
   poem.favor = !poem.favor
-  // TODO save it
+  await poem.save()
+  await persist()
 }
 
 </script>

@@ -49,9 +49,9 @@ import {
   modalController,
 } from '@ionic/vue';
 import { ref } from 'vue';
-import { Poem } from '@/types/poem.types';
+import { Poem } from '@/entity/Poem';
 
-defineProps<{
+const props = defineProps<{
   titleText: string,
   confirmText: string,
   poem?: Poem,
@@ -67,21 +67,36 @@ function cancel() {
   modalController.dismiss(null, 'cancel')
 }
 
-function confirm() {
-  const no_ = no.value.$el.value
-  const title_ = title.value.$el.value
-  const dynasty_ = dynasty.value.$el.value
-  const author_ = author.value.$el.value
-  const content_ = content.value.$el.value
+function nonEmptyOr(s: string, default_: string) : string {
+  const ss = s.trim()
+  if (ss.length == 0) {
+    return default_
+  } else {
+    return ss
+  }
+}
 
-  modalController.dismiss({
-    id: 0,
-    no: no_,
-    title: title_,
-    dynasty: dynasty_,
-    author: author_,
-    content: content_,
-  }, 'confirm')
+function validOr(no: number, default_: number) : number {
+  const n = Math.trunc(no)
+  if (n <= 0) {
+    return default_
+  } else {
+    return n
+  }
+}
+
+function confirm() {
+  const poem = props.poem
+
+  const p = new Poem()
+  p.no = validOr(no.value.$el.value, poem ? poem.no : 0)
+  p.title = nonEmptyOr(title.value.$el.value, "未知")
+  p.dynasty = nonEmptyOr(dynasty.value.$el.value, "未知")
+  p.author = nonEmptyOr(author.value.$el.value, "佚名")
+  p.content = nonEmptyOr(content.value.$el.value, "")
+  p.favor = poem ? poem.favor : false
+
+  modalController.dismiss(p, 'confirm')
 }
 
 </script>
