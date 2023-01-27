@@ -31,7 +31,7 @@
         </ion-buttons>
 
         <ion-searchbar :debounce="500" placeholder="搜索"
-                       @ion-change="search = Search.fromString($event.target.value!)"></ion-searchbar>
+                       @ion-change="setSearch($event.target.value!)"></ion-searchbar>
 
         <ion-buttons slot="end">
           <ion-button fill="clear" shape="round" @click="favorOnly = !favorOnly">
@@ -105,6 +105,8 @@ import {ref, watch} from 'vue';
 import {trash, add, pencil, enter, exit, star, starOutline} from 'ionicons/icons';
 
 import PoemModal from '@/components/PoemModal.vue';
+import PoemDetailModal from "@/components/PoemDetailModal.vue";
+
 import {Search} from '@/types/poem.types';
 import {Poem} from '@/entity/Poem'
 import PoemDataSource from '@/data-source';
@@ -116,6 +118,13 @@ const poems = ref<Poem[]>([])
 const favorOnly = ref<boolean>(false)
 const search = ref<Search>(new Search())
 const refresh = ref(0)
+
+function setSearch(userSearch: string) {
+  const newSearch = Search.fromString(userSearch)
+  if (!newSearch.equals(search.value)) {
+    search.value = newSearch
+  }
+}
 
 async function persist() {
   const platform = Capacitor.getPlatform()
@@ -138,23 +147,23 @@ watch([favorOnly, search, refresh], async () => {
   }
 
   if (title) {
-    q.where('poem.title LIKE %:title%', {title})
+    q.where('poem.title LIKE :title', {title: `%${title}%`})
   }
 
   if (dynasty) {
-    q.where('poem.dynasty LIKE %:dynasty%', {dynasty})
+    q.where('poem.dynasty LIKE :dynasty', {dynasty: `%${dynasty}%`})
   }
 
   if (author) {
-    q.where('poem.author LIKE %:author%', {author})
+    q.where('poem.author LIKE :author', {author: `%${author}%`})
   }
 
   if (keys) {
     for (const [index, key] of keys.entries()) {
       const name = `key${index}`
       const params: any = {}
-      params[name] = key
-      q.where(`poem.author LIKE %:${name}%`, params)
+      params[name] = `%${key}%`
+      q.where(`poem.content LIKE :${name}`, params)
     }
   }
 
@@ -204,8 +213,17 @@ function exportPoems() {
   console.log("export")
 }
 
-function onPoemClick(poem: Poem) {
-  console.log("detail", poem)
+async function onPoemClick(poem: Poem) {
+  const modal = await modalController.create({
+    component: PoemDetailModal,
+    componentProps: {
+      poem: poem,
+      search: search.value,
+    }
+  });
+  modal.present();
+
+  await modal.onWillDismiss();
 }
 
 async function onPoemDeleteClick(poem: Poem) {
