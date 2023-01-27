@@ -7,15 +7,15 @@
     </ion-header>
     <ion-content class="ion-padding-top">
       <ion-list>
-        <ion-item button detail=false id="add-poem">
+        <ion-item button :detail=false @click="addPoem">
           <ion-icon :icon="add" slot="start"></ion-icon>
           添加
         </ion-item>
-        <ion-item button detail=false @click="importPoems">
+        <ion-item button :detail=false @click="importPoems">
           <ion-icon :icon="enter" slot="start"></ion-icon>
           导入
         </ion-item>
-        <ion-item button detail=false @click="exportPoems">
+        <ion-item button :detail=false @click="exportPoems">
           <ion-icon :icon="exit" slot="start"></ion-icon>
           导出
         </ion-item>
@@ -30,7 +30,8 @@
           <ion-menu-button></ion-menu-button>
         </ion-buttons>
 
-        <ion-searchbar :debounce="500" placeholder="搜索"></ion-searchbar>
+        <ion-searchbar :debounce="500" placeholder="搜索"
+          @ion-change="search = Search.fromString($event.target.value!)"></ion-searchbar>
 
         <ion-buttons slot="end">
           <ion-button fill="clear" shape="round" @click="favorOnly = !favorOnly">
@@ -42,16 +43,10 @@
     </ion-header>
 
     <ion-content :fullscreen="true">
-
-      <!-- 添加对话框 -->
-      <ion-modal trigger="add-poem" @willDismiss="onAddDismissed">
-        <poem-modal title-text="添加诗词" confirm-text="添加" />
-      </ion-modal>
-
       <!-- 主要内容 -->
       <ion-list>
 
-        <ion-item-sliding v-for="poem in poems" :key="poem.id">
+        <ion-item-sliding v-for="poem in filteredPoems" :key="poem.id">
           <ion-item>
             <ion-label button @click="onPoemClick(poem)">
               {{ poem.no }}. {{ poem.title }} ({{ poem.dynasty }} {{ poem.author }})
@@ -102,18 +97,84 @@ import {
   IonItemSliding,
   IonItemOptions,
   IonItemOption,
-  IonModal,
   modalController,
   actionSheetController,
+  menuController,
 } from '@ionic/vue';
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 import { trash, add, pencil, enter, exit, star, starOutline } from 'ionicons/icons';
-import { OverlayEventDetail } from '@ionic/core/components';
 
 import PoemModal from '@/components/PoemModal.vue';
-import { Poem } from '@/types/poem.types';
+import { Poem, Search } from '@/types/poem.types';
+
+
+const poems = ref<Poem[]>([
+  {
+    id: 0,
+    no: 1,
+    title: "静夜思",
+    dynasty: "唐代",
+    author: "李白",
+    content: "测试测试测试",
+    favor: false
+  },
+  {
+    id: 0,
+    no: 2,
+    title: "静夜思2",
+    dynasty: "唐代",
+    author: "李白",
+    content: "测试测试测试",
+    favor: true,
+  },
+])
 
 const favorOnly = ref<boolean>(false)
+const search = ref<Search>(new Search())
+
+const filteredPoems = computed(() => {
+  if (search.value.empty()) {
+    return poems.value.filter(poem => {
+      if (favorOnly.value) {
+        if (!poem.favor) {
+          return false
+        }
+      }
+
+      return true
+    })
+  } else {
+    return poems.value.filter(poem => {
+      if (favorOnly.value) {
+        if (!poem.favor) {
+          return false
+        }
+      }
+
+      return search.value.match(poem)
+    })
+  }
+})
+
+async function addPoem() {
+  await menuController.close()
+
+  const modal = await modalController.create({
+    component: PoemModal,
+    componentProps: {
+      titleText: "添加诗词",
+      confirmText: "添加",
+    }
+  });
+  modal.present();
+
+  const { data, role } = await modal.onWillDismiss();
+
+  if (role === 'confirm') {
+    // TODO add
+    console.log("add", data)
+  }
+}
 
 function importPoems() {
   console.log("import")
@@ -121,13 +182,6 @@ function importPoems() {
 
 function exportPoems() {
   console.log("export")
-}
-
-function onAddDismissed(ev: CustomEvent<OverlayEventDetail>) {
-  if (ev.detail.role === 'confirm') {
-    const poem = ev.detail.data
-    console.log(poem)
-  }
 }
 
 function onPoemClick(poem: Poem) {
@@ -190,55 +244,7 @@ function onPoemToggleFavorClick(poem: Poem) {
   // TODO save it
 }
 
-const poems = ref<Poem[]>([
-  {
-    id: 0,
-    no: 1,
-    title: "静夜思",
-    dynasty: "唐代",
-    author: "李白",
-    content: "测试测试测试",
-    favor: false
-  },
-  {
-    id: 0,
-    no: 2,
-    title: "静夜思2",
-    dynasty: "唐代",
-    author: "李白",
-    content: "测试测试测试",
-    favor: true,
-  },
-])
-
 </script>
 
 <style scoped>
-#container {
-  text-align: center;
-
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 50%;
-  transform: translateY(-50%);
-}
-
-#container strong {
-  font-size: 20px;
-  line-height: 26px;
-}
-
-#container p {
-  font-size: 16px;
-  line-height: 22px;
-
-  color: #8c8c8c;
-
-  margin: 0;
-}
-
-#container a {
-  text-decoration: none;
-}
 </style>
