@@ -80,34 +80,37 @@
 
 <script setup lang="ts">
 import {
+  actionSheetController,
+  IonButton,
+  IonButtons,
   IonContent,
   IonHeader,
-  IonPage,
-  IonList,
+  IonIcon,
   IonItem,
-  IonTitle,
-  IonButtons,
+  IonItemOption,
+  IonItemOptions,
+  IonItemSliding,
+  IonLabel,
+  IonList,
   IonMenu,
   IonMenuButton,
-  IonButton,
+  IonPage,
   IonSearchbar,
+  IonTitle,
   IonToolbar,
-  IonIcon,
-  IonLabel,
-  IonItemSliding,
-  IonItemOptions,
-  IonItemOption,
-  modalController,
-  actionSheetController,
   menuController,
+  modalController,
+  toastController,
 } from '@ionic/vue';
 import {ref, watch} from 'vue';
-import {trash, add, pencil, enter, exit, star, starOutline} from 'ionicons/icons';
+import {add, enter, exit, pencil, star, starOutline, trash} from 'ionicons/icons';
+import {Directory, Encoding, Filesystem} from '@capacitor/filesystem';
 
 import PoemModal from '@/components/PoemModal.vue';
 import PoemDetailModal from "@/components/PoemDetailModal.vue";
 
-import {Search} from '@/types/poem.types';
+import {Search} from '@/types/search.types';
+import {UserPoem} from "@/types/userpoem.types";
 import {Poem} from '@/entity/Poem'
 import PoemDataSource from '@/data-source';
 import sqliteConnection from '@/database';
@@ -205,12 +208,123 @@ async function addPoem() {
   }
 }
 
-function importPoems() {
-  console.log("import")
+async function msg(message: string, duration = 1500) {
+  const toast = await toastController.create({
+    message,
+    duration,
+    position: "middle"
+  });
+  await toast.present();
 }
 
-function exportPoems() {
-  console.log("export")
+const IMPORT_EXPORT_PATH = 'poems.json'
+
+async function importPoems() {
+  await menuController.close()
+
+  const result = await Filesystem.getUri({
+    path: IMPORT_EXPORT_PATH,
+    directory: Directory.External,
+  });
+
+  const actionSheet = await actionSheetController.create({
+    header: '导入将删除所有诗词，是否继续？',
+    subHeader: `将从 ${result.uri} 导入`,
+    buttons: [
+      {
+        text: '导入',
+        role: 'destructive',
+        data: {
+          action: 'delete',
+        },
+      },
+      {
+        text: '取消',
+        role: 'cancel',
+        data: {
+          action: 'cancel',
+        },
+      },
+    ],
+  });
+
+  await actionSheet.present();
+  const {role} = await actionSheet.onDidDismiss();
+  if (role !== 'destructive') {
+    return
+  }
+
+  try {
+    const content = await Filesystem.readFile({
+      path: IMPORT_EXPORT_PATH,
+      directory: Directory.External,
+      encoding: Encoding.UTF8,
+    });
+
+    const userPoems = JSON.parse(content.data) as UserPoem[]
+    const poemRepository = PoemDataSource.getRepository(Poem)
+    await poemRepository.clear()
+
+    const poems = userPoems.map(userPoem => Poem.fromUserPoem(userPoem))
+    await poemRepository.manager.transaction(async (mgr) => {
+      await mgr.save(poems)
+    })
+
+    await persist()
+
+    await msg(`导入成功`)
+  } catch (e) {
+    await msg(`导入失败：${e}`)
+  }
+}
+
+async function exportPoems() {
+  await menuController.close()
+
+  const result = await Filesystem.getUri({
+    path: IMPORT_EXPORT_PATH,
+    directory: Directory.External,
+  });
+
+  const actionSheet = await actionSheetController.create({
+    header: '即将导出，是否继续？',
+    subHeader: `将导出到 ${result.uri}`,
+    buttons: [
+      {
+        text: '导出',
+        role: 'destructive',
+        data: {
+          action: 'delete',
+        },
+      },
+      {
+        text: '取消',
+        role: 'cancel',
+        data: {
+          action: 'cancel',
+        },
+      },
+    ],
+  });
+
+  await actionSheet.present();
+  const {role} = await actionSheet.onDidDismiss();
+  if (role !== 'destructive') {
+    return
+  }
+
+  const poems = await Poem.find()
+  const userPoems = poems.map(poem => poem.toUserPoem())
+
+  await Filesystem.writeFile({
+    path: IMPORT_EXPORT_PATH,
+    data: JSON.stringify(userPoems),
+    directory: Directory.External,
+    encoding: Encoding.UTF8,
+    recursive: true,
+  })
+
+  await msg('导出成功')
 }
 
 async function onPoemClick(poem: Poem) {

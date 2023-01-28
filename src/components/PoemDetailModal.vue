@@ -29,7 +29,7 @@ import {
 } from '@ionic/vue';
 import {arrowBack} from 'ionicons/icons';
 import {Poem} from '@/entity/Poem';
-import {Search} from "@/types/poem.types";
+import {Search} from "@/types/search.types";
 
 const props = defineProps<{
   poem: Poem,

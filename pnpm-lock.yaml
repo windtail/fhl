@@ -6,6 +6,7 @@ specifiers:
   '@capacitor/app': 4.1.1
   '@capacitor/cli': 4.6.2
   '@capacitor/core': 4.6.2
+  '@capacitor/filesystem': ^4.1.4
   '@capacitor/haptics': 4.1.0
   '@capacitor/keyboard': 4.1.1
   '@capacitor/status-bar': 4.1.1
@@ -46,6 +47,7 @@ dependencies:
   '@capacitor/android': 4.6.2_@capacitor+core@4.6.2
   '@capacitor/app': 4.1.1_@capacitor+core@4.6.2
   '@capacitor/core': 4.6.2
+  '@capacitor/filesystem': 4.1.4_@capacitor+core@4.6.2
   '@capacitor/haptics': 4.1.0_@capacitor+core@4.6.2
   '@capacitor/keyboard': 4.1.1_@capacitor+core@4.6.2
   '@capacitor/status-bar': 4.1.1_@capacitor+core@4.6.2
@@ -1503,6 +1505,14 @@ packages:
     resolution: {integrity: sha512-M/KpAg+peft/HTb7svLiKHxjbll67ybs1vEqhZuvjXlwro53NxNXR4YJS7+wNXZSiA4Kxjtf+a754xGgZcMarA==}
     dependencies:
       tslib: 2.4.1
+    dev: false
+
+  /@capacitor/filesystem/4.1.4_@capacitor+core@4.6.2:
+    resolution: {integrity: sha512-ivko1RNK4hq63xhMacq8D6D97N5/SAafTsrmY/pghYrG6Cl2SEY0+IgRu7V9/VWeN3FSplyUPucjUTAFQxXN5g==}
+    peerDependencies:
+      '@capacitor/core': ^4.0.0
+    dependencies:
+      '@capacitor/core': 4.6.2
     dev: false
 
   /@capacitor/haptics/4.1.0_@capacitor+core@4.6.2:
