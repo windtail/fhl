@@ -46,6 +46,27 @@ export class Search {
         return search
     }
 
+    toString(): string {
+        if (this.no) {
+            return this.no.toString()
+        } else {
+            let user = []
+            if (this.title) {
+                user.push(`t${this.title}`)
+            }
+            if (this.dynasty) {
+                user.push(`d${this.dynasty}`)
+            }
+            if (this.author) {
+                user.push(`a${this.author}`)
+            }
+            if (this.keys) {
+                user = [user, ...this.keys]
+            }
+            return user.join(" ")
+        }
+    }
+
     empty(): boolean {
         return !(this.keys || this.no || this.title || this.dynasty || this.author)
     }

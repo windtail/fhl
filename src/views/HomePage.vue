@@ -7,18 +7,34 @@
     </ion-header>
     <ion-content class="ion-padding-top">
       <ion-list>
-        <ion-item button :detail=false @click="addPoem">
-          <ion-icon :icon="add" slot="start"></ion-icon>
-          添加
-        </ion-item>
-        <ion-item button :detail=false @click="importPoems">
-          <ion-icon :icon="enter" slot="start"></ion-icon>
-          导入
-        </ion-item>
-        <ion-item button :detail=false @click="exportPoems">
-          <ion-icon :icon="exit" slot="start"></ion-icon>
-          导出
-        </ion-item>
+        <ion-item-group>
+          <ion-item-divider>
+            <ion-label>操作</ion-label>
+          </ion-item-divider>
+
+          <ion-item button :detail=false @click="openAdvancedSearch">
+            <ion-icon :icon="searchOutline" slot="start"></ion-icon>
+            高级搜索
+          </ion-item>
+          <ion-item button :detail=false @click="addPoem">
+            <ion-icon :icon="add" slot="start"></ion-icon>
+            添加
+          </ion-item>
+        </ion-item-group>
+        <ion-item-group>
+          <ion-item-divider>
+            <ion-label>暂不支持</ion-label>
+          </ion-item-divider>
+
+          <ion-item button :detail=false @click="importPoems">
+            <ion-icon :icon="enterOutline" slot="start"></ion-icon>
+            导入
+          </ion-item>
+          <ion-item button :detail=false @click="exportPoems">
+            <ion-icon :icon="exitOutline" slot="start"></ion-icon>
+            导出
+          </ion-item>
+        </ion-item-group>
       </ion-list>
     </ion-content>
   </ion-menu>
@@ -30,8 +46,7 @@
           <ion-menu-button></ion-menu-button>
         </ion-buttons>
 
-        <ion-searchbar :debounce="500" placeholder="搜索"
-                       @ion-change="setSearch($event.target.value!)"></ion-searchbar>
+        <ion-searchbar :debounce="500" placeholder="搜索" v-model="userSearch"></ion-searchbar>
 
         <ion-buttons slot="end">
           <ion-button fill="clear" shape="round" @click="favorOnly = !favorOnly">
@@ -103,7 +118,16 @@ import {
   toastController,
 } from '@ionic/vue';
 import {ref, watch} from 'vue';
-import {add, enter, exit, pencil, star, starOutline, trash} from 'ionicons/icons';
+import {
+  add,
+  enterOutline,
+  exitOutline,
+  pencil,
+  searchOutline,
+  star,
+  starOutline,
+  trash
+} from 'ionicons/icons';
 import {Directory, Encoding, Filesystem} from '@capacitor/filesystem';
 
 import PoemModal from '@/components/PoemModal.vue';
@@ -115,19 +139,20 @@ import {Poem} from '@/entity/Poem'
 import PoemDataSource from '@/data-source';
 import sqliteConnection from '@/database';
 import {Capacitor} from '@capacitor/core';
+import AdvanceSearchModal from "@/components/AdvanceSearchModal.vue";
 
 const poems = ref<Poem[]>([])
-
+const userSearch = ref("")
 const favorOnly = ref<boolean>(false)
-const search = ref<Search>(new Search())
 const refresh = ref(0)
 
-function setSearch(userSearch: string) {
-  const newSearch = Search.fromString(userSearch)
+const search = ref<Search>(new Search())
+watch(userSearch, () => {
+  const newSearch = Search.fromString(userSearch.value)
   if (!newSearch.equals(search.value)) {
     search.value = newSearch
   }
-}
+})
 
 async function persist() {
   const platform = Capacitor.getPlatform()
@@ -181,6 +206,21 @@ async function getNextNo(): Promise<number> {
   const result = await query.getRawOne();
   const no = result ? result.max : 0;
   return no + 1;
+}
+
+async function openAdvancedSearch() {
+  await menuController.close()
+
+  const modal = await modalController.create({
+    component: AdvanceSearchModal,
+  });
+  modal.present();
+
+  const {data, role} = await modal.onWillDismiss();
+
+  if (role === 'confirm') {
+      userSearch.value = (data as Search).toString()
+  }
 }
 
 async function addPoem() {
