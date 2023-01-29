@@ -116,6 +116,7 @@ import {
   menuController,
   modalController,
   toastController,
+  loadingController,
 } from '@ionic/vue';
 import {ref, watch} from 'vue';
 import {
@@ -165,6 +166,11 @@ async function persist() {
 }
 
 watch([favorOnly, search, refresh], async () => {
+  const loading = await loadingController.create({
+    message: '正在加载...',
+  });
+  await loading.present();
+
   const conditions: { where: string, parameters?: ObjectLiteral }[] = []
 
   if (favorOnly.value) {
@@ -208,6 +214,8 @@ watch([favorOnly, search, refresh], async () => {
     }
     poems.value = await q.getMany()
   }
+
+  await loading.dismiss()
 }, {
   immediate: true
 })
