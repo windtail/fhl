@@ -140,6 +140,7 @@ import PoemDataSource from '@/data-source';
 import sqliteConnection from '@/database';
 import {Capacitor} from '@capacitor/core';
 import AdvanceSearchModal from "@/components/AdvanceSearchModal.vue";
+import {ObjectLiteral} from "typeorm";
 
 const poems = ref<Poem[]>([])
 const userSearch = ref("")
@@ -164,38 +165,49 @@ async function persist() {
 }
 
 watch([favorOnly, search, refresh], async () => {
-  const q = PoemDataSource.getRepository(Poem).createQueryBuilder('poem')
+  const conditions: { where: string, parameters?: ObjectLiteral }[] = []
+
   if (favorOnly.value) {
-    q.where('poem.favor = :favor', {favor: 1})
+    conditions.push({where: 'poem.favor = :favor', parameters: {favor: 1}})
   }
 
   const {no, title, dynasty, author, keys} = search.value
   if (no) {
-    q.where('poem.no = :no', {no})
+    conditions.push({where: 'poem.no = :no', parameters: {no}})
   }
 
   if (title) {
-    q.where('poem.title LIKE :title', {title: `%${title}%`})
+    conditions.push({where: 'poem.title LIKE :title', parameters: {title: `%${title}%`}})
   }
 
   if (dynasty) {
-    q.where('poem.dynasty LIKE :dynasty', {dynasty: `%${dynasty}%`})
+    conditions.push({where: 'poem.dynasty LIKE :dynasty', parameters: {dynasty: `%${dynasty}%`}})
   }
 
   if (author) {
-    q.where('poem.author LIKE :author', {author: `%${author}%`})
+    conditions.push({where: 'poem.author LIKE :author', parameters: {author: `%${author}%`}})
   }
 
   if (keys) {
     for (const [index, key] of keys.entries()) {
       const name = `key${index}`
-      const params: any = {}
-      params[name] = `%${key}%`
-      q.where(`poem.content LIKE :${name}`, params)
+      const parameters: ObjectLiteral = {}
+      parameters[name] = `%${key}%`
+      conditions.push({where: `poem.content LIKE :${name}`, parameters})
     }
   }
 
-  poems.value = await q.getMany()
+  if (conditions.length == 0) {
+    poems.value = await Poem.find()
+  } else {
+    const q = PoemDataSource.getRepository(Poem).createQueryBuilder('poem')
+    const {where, parameters} = conditions[0]
+    q.where(where, parameters)
+    for (const {where, parameters} of conditions.slice(1)) {
+      q.andWhere(where, parameters)
+    }
+    poems.value = await q.getMany()
+  }
 }, {
   immediate: true
 })
@@ -219,7 +231,7 @@ async function openAdvancedSearch() {
   const {data, role} = await modal.onWillDismiss();
 
   if (role === 'confirm') {
-      userSearch.value = (data as Search).toString()
+    userSearch.value = (data as Search).toString()
   }
 }
 
