@@ -225,6 +225,9 @@ async function openAdvancedSearch() {
 
   const modal = await modalController.create({
     component: AdvanceSearchModal,
+    componentProps: {
+      search: search.value
+    }
   });
   modal.present();
 

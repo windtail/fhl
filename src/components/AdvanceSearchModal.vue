@@ -47,14 +47,38 @@ import {
   modalController,
   IonIcon,
 } from '@ionic/vue';
-import {ref} from 'vue';
+import {ref, onMounted} from 'vue';
 import {arrowBack} from 'ionicons/icons';
 import {Search} from "@/types/search.types";
+
+const props = defineProps<{
+  search: Search,
+}>()
 
 const title = ref("")
 const dynasty = ref("")
 const author = ref("")
 const content = ref("")
+
+onMounted(() => {
+  const {title: title_, dynasty: dynasty_, author: author_, keys} = props.search
+
+  if (title_) {
+    title.value = title_
+  }
+
+  if (dynasty_) {
+    dynasty.value = dynasty_
+  }
+
+  if (author_) {
+    author.value = author_
+  }
+
+  if (keys) {
+    content.value = keys.join(" ")
+  }
+})
 
 function cancel() {
   modalController.dismiss(null, 'cancel')
