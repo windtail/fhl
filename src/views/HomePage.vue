@@ -59,7 +59,7 @@
 
     <ion-content :fullscreen="true">
       <!-- 主要内容 -->
-      <ion-list>
+      <ion-list ref="mainList">
 
         <ion-item-sliding v-for="poem in poems" :key="poem.id">
           <ion-item>
@@ -149,6 +149,8 @@ import {Capacitor} from '@capacitor/core';
 import AdvanceSearchModal from "@/components/AdvanceSearchModal.vue";
 import {ObjectLiteral} from "typeorm";
 import {Segment} from "@/entity/Segment";
+
+const mainList = ref(null)
 
 const poems = ref<Poem[]>([])
 const userSearch = ref("")
@@ -425,6 +427,8 @@ async function onPoemClick(poem: Poem) {
 }
 
 async function onPoemDeleteClick(poem: Poem) {
+  await mainList.value.$el.closeSlidingItems()
+
   const actionSheet = await actionSheetController.create({
     header: `删除 ${poem.title} (${poem.dynasty} ${poem.author}) ？`,
     subHeader: '删除后不可恢复',
@@ -456,6 +460,8 @@ async function onPoemDeleteClick(poem: Poem) {
 }
 
 async function onPoemEditClick(poem: Poem) {
+  await mainList.value.$el.closeSlidingItems()
+
   const modal = await modalController.create({
     component: PoemModal,
     componentProps: {
