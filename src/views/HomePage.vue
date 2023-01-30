@@ -65,6 +65,10 @@
           <ion-item>
             <ion-label button @click="onPoemClick(poem)">
               {{ poem.no }}. {{ poem.title }} ({{ poem.dynasty }} {{ poem.author }})
+              <template v-if="search.keys">
+                <br />
+                <span v-html="poem.searchPreview"></span>
+              </template>
             </ion-label>
             <ion-buttons slot="end">
               <ion-button @click="onPoemToggleFavorClick(poem)">
@@ -102,6 +106,8 @@ import {
   IonHeader,
   IonIcon,
   IonItem,
+  IonItemGroup,
+  IonItemDivider,
   IonItemOption,
   IonItemOptions,
   IonItemSliding,
@@ -142,6 +148,7 @@ import sqliteConnection from '@/database';
 import {Capacitor} from '@capacitor/core';
 import AdvanceSearchModal from "@/components/AdvanceSearchModal.vue";
 import {ObjectLiteral} from "typeorm";
+import {Segment} from "@/entity/Segment";
 
 const poems = ref<Poem[]>([])
 const userSearch = ref("")
@@ -207,12 +214,25 @@ watch([favorOnly, search, refresh], async () => {
     poems.value = await Poem.find()
   } else {
     const q = PoemDataSource.getRepository(Poem).createQueryBuilder('poem')
+    q.leftJoinAndSelect(
+        "poem.segments",
+        "segment"
+    )
     const {where, parameters} = conditions[0]
     q.where(where, parameters)
     for (const {where, parameters} of conditions.slice(1)) {
       q.andWhere(where, parameters)
     }
-    poems.value = await q.getMany()
+    q.orderBy("segment.id", "ASC")
+    const poems_ = await q.getMany()
+    if (keys) {
+      for (const p of poems_) {
+        p.updateSearchPreview(keys)
+        console.log("search preview", p.searchPreview)
+      }
+    }
+
+    poems.value = poems_
   }
 
   await loading.dismiss()
@@ -265,6 +285,7 @@ async function addPoem() {
     if (poem.no == 0) {
       poem.no = await getNextNo()
     }
+    poem.generateSegments()
 
     await poem.save()
     await persist()
@@ -453,6 +474,15 @@ async function onPoemEditClick(poem: Poem) {
     editedPoem.id = poem.id
     editedPoem.favor = poem.favor
 
+    await PoemDataSource
+        .getRepository(Segment)
+        .createQueryBuilder('segment')
+        .delete()
+        .from(Segment)
+        .where("segment.poemId = :poemId", {poemId: poem.id})
+        .execute()
+
+    editedPoem.generateSegments()
     await editedPoem.save()
     await persist()
   }
