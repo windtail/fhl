@@ -6,7 +6,7 @@
     "module": "esnext",
     "strict": true,
     "jsx": "preserve",
-    "importHelpers": true,
+    "importHelpers": false,
     "moduleResolution": "node",
     "skipLibCheck": true,
     "esModuleInterop": true,
@@ -14,6 +14,7 @@
     "sourceMap": true,
     "baseUrl": ".",
     "types": [
+      "node",
       "webpack-env",
       "jest"
     ],
