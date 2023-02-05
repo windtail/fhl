@@ -20,6 +20,10 @@
             <ion-icon :icon="add" slot="start"></ion-icon>
             添加
           </ion-item>
+          <ion-item button :detail=false @click="initPoem">
+            <ion-icon :icon="enterOutline" slot="start"></ion-icon>
+            初始化
+          </ion-item>
         </ion-item-group>
         <ion-item-group>
           <ion-item-divider>
@@ -156,6 +160,7 @@ import AdvanceSearchModal from "@/components/AdvanceSearchModal.vue";
 import {ObjectLiteral} from "typeorm";
 import {Segment} from "@/entity/Segment";
 import {CapacitorHttp} from '@capacitor/core';
+import myInitPoems from './poems.json';
 
 const mainList = ref(null)
 
@@ -304,6 +309,60 @@ async function addPoem() {
 
     await poem.save()
     await persist()
+  }
+}
+
+async function initPoem() {
+  await menuController.close()
+
+  const actionSheet = await actionSheetController.create({
+    header: '初始化将删除所有诗词，是否继续？',
+    buttons: [
+      {
+        text: '初始化',
+        role: 'destructive',
+        data: {
+          action: 'delete',
+        },
+      },
+      {
+        text: '取消',
+        role: 'cancel',
+        data: {
+          action: 'cancel',
+        },
+      },
+    ],
+  });
+
+  await actionSheet.present();
+  const {role} = await actionSheet.onDidDismiss();
+  if (role !== 'destructive') {
+    return
+  }
+
+  const loading = await loadingController.create({
+    message: '正在初始化...',
+  });
+  await loading.present();
+
+  try {
+    const userPoems = myInitPoems as UserPoem[]
+    const poemRepository = PoemDataSource.getRepository(Poem)
+    await poemRepository.clear()
+
+    const poems = userPoems.map(userPoem => Poem.fromUserPoem(userPoem))
+    await poemRepository.manager.transaction(async (mgr) => {
+      await mgr.save(poems)
+    })
+
+    await persist()
+
+    await loading.dismiss()
+    await msg(`导入成功`)
+  } catch (e) {
+    await loading.dismiss()
+    await msg(`导入失败：${e}`)
   }
 }
 
