@@ -272,7 +272,7 @@ async function openAdvancedSearch() {
       search: search.value
     }
   });
-  modal.present();
+  await modal.present();
 
   const {data, role} = await modal.onWillDismiss();
 
@@ -291,7 +291,7 @@ async function addPoem() {
       confirmText: "添加",
     }
   });
-  modal.present();
+  await modal.present();
 
   const {data, role} = await modal.onWillDismiss();
 
@@ -437,10 +437,10 @@ async function exportPoems() {
       }
     });
 
-    loading.dismiss()
+    await loading.dismiss()
     await msg('导出成功')
   } catch (e) {
-    loading.dismiss()
+    await loading.dismiss()
     await msg(`导出失败：${e}`)
   }
 }
@@ -486,7 +486,7 @@ async function onPoemClick(poem: Poem) {
       search: search.value,
     }
   });
-  modal.present();
+  await modal.present();
 
   await modal.onWillDismiss();
 }
@@ -536,7 +536,7 @@ async function onPoemEditClick(poem: Poem) {
       poem: poem,
     }
   });
-  modal.present();
+  await modal.present();
 
   const {data, role} = await modal.onWillDismiss();
 
