@@ -27,7 +27,7 @@
         </ion-item-group>
         <ion-item-group>
           <ion-item-divider>
-            <ion-label>暂不支持</ion-label>
+            <ion-label>导入导出（仅测试了坚果云）</ion-label>
           </ion-item-divider>
 
           <ion-item button :detail=false @click="importPoems">
@@ -40,7 +40,7 @@
           </ion-item>
           <ion-item button :detail=false @click="configImportExport">
             <ion-icon :icon="settingsOutline" slot="start"></ion-icon>
-            导入导出设置
+            设置
           </ion-item>
         </ion-item-group>
       </ion-list>
@@ -161,6 +161,8 @@ import {ObjectLiteral} from "typeorm";
 import {Segment} from "@/entity/Segment";
 import {CapacitorHttp} from '@capacitor/core';
 import myInitPoems from './poems.json';
+import {ImportExportConfig} from "@/types/io.types";
+import IoConfigModal from "@/components/IoConfigModal.vue";
 
 const mainList = ref(null)
 
@@ -375,26 +377,90 @@ async function msg(message: string, duration = 1500) {
   await toast.present();
 }
 
-class ImportExportUrl {
-  static KEY = "io-url"
+class IoConfig implements ImportExportConfig {
+  password: string;
+  url: string;
+  username: string;
 
-  static async get(): Promise<string> {
-    const result = await Preferences.get({key: ImportExportUrl.KEY})
-    return result.value || "http://192.168.1.100:8000/poems.json"
+  constructor() {
+    this.username = ""
+    this.password = ""
+    this.url = "https://dav.jianguoyun.com/dav/poems/poems.json"
   }
 
-  static async set(val: string) {
-    await Preferences.set({key: ImportExportUrl.KEY, value: val})
+  static WEBDAV_KEY = "webdav"
+
+  async load() {
+    const result = await Preferences.get({key: IoConfig.WEBDAV_KEY})
+    if (result.value) {
+      const config = JSON.parse(result.value) as ImportExportConfig
+
+      this.username = config.username
+      this.password = config.password
+      this.url = config.url
+    }
   }
+
+  async doStoreConfig(config: ImportExportConfig) {
+    await Preferences.set({key: IoConfig.WEBDAV_KEY, value: JSON.stringify(config)})
+  }
+
+  async store() {
+    await this.doStoreConfig(this)
+  }
+
+  authorization(): string {
+    return "Basic " + btoa(`${this.username}:${this.password}`)
+  }
+}
+
+
+class ImportExport {
+
+  static async import_(config: IoConfig) {
+    const response: HttpResponse = await CapacitorHttp.get({
+      url: config.url,
+      headers: {Authorization: config.authorization()}
+    });
+
+    const data = JSON.parse(response.data)
+
+    const userPoems = data as UserPoem[]
+    const poemRepository = PoemDataSource.getRepository(Poem)
+    await poemRepository.clear()
+
+    const poems = userPoems.map(userPoem => Poem.fromUserPoem(userPoem))
+    await poemRepository.manager.transaction(async (mgr) => {
+      await mgr.save(poems)
+    })
+
+    await persist()
+  }
+
+  static async export_(config: IoConfig) {
+    const poems = await Poem.find()
+    const userPoems = poems.map(poem => poem.toUserPoem())
+
+    await CapacitorHttp.put({
+      url: config.url,
+      data: userPoems,
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: config.authorization()
+      }
+    });
+  }
+
 }
 
 async function importPoems() {
   await menuController.close()
-  const url = await ImportExportUrl.get()
+  const config = new IoConfig()
+  await config.load()
 
   const actionSheet = await actionSheetController.create({
     header: '导入将删除所有诗词，是否继续？',
-    subHeader: `将从 ${url} 导入`,
+    subHeader: `将从 ${config.url} 导入`,
     buttons: [
       {
         text: '导入',
@@ -425,23 +491,10 @@ async function importPoems() {
   await loading.present();
 
   try {
-    const response: HttpResponse = await CapacitorHttp.get({
-      url
-    });
-
-    const userPoems = response.data as UserPoem[]
-    const poemRepository = PoemDataSource.getRepository(Poem)
-    await poemRepository.clear()
-
-    const poems = userPoems.map(userPoem => Poem.fromUserPoem(userPoem))
-    await poemRepository.manager.transaction(async (mgr) => {
-      await mgr.save(poems)
-    })
-
-    await persist()
+    await ImportExport.import_(config)
 
     await loading.dismiss()
-    await msg(`导入成功`)
+    await msg("导入成功")
   } catch (e) {
     await loading.dismiss()
     await msg(`导入失败：${e}`)
@@ -450,11 +503,12 @@ async function importPoems() {
 
 async function exportPoems() {
   await menuController.close()
-  const url = await ImportExportUrl.get()
+  const config = new IoConfig()
+  await config.load()
 
   const actionSheet = await actionSheetController.create({
     header: '即将导出，是否继续？',
-    subHeader: `将导出到 ${url}`,
+    subHeader: `将导出到 ${config.url}`,
     buttons: [
       {
         text: '导出',
@@ -484,18 +538,8 @@ async function exportPoems() {
   });
   await loading.present();
 
-  const poems = await Poem.find()
-  const userPoems = poems.map(poem => poem.toUserPoem())
-
   try {
-    await CapacitorHttp.put({
-      url,
-      data: userPoems,
-      headers: {
-        "Content-Type": "application/json"
-      }
-    });
-
+    await ImportExport.export_(config)
     await loading.dismiss()
     await msg('导出成功')
   } catch (e) {
@@ -505,36 +549,24 @@ async function exportPoems() {
 }
 
 async function configImportExport() {
-  const url = await ImportExportUrl.get()
+  await menuController.close()
 
-  const alert = await alertController.create({
-    header: '请设置导入导出URL',
-    buttons: [
-      {
-        text: '确定',
-        role: 'destructive',
-      },
-      {
-        text: '取消',
-        role: 'cancel',
-      }
-    ],
-    inputs: [
-      {
-        placeholder: 'URL',
-        type: "url",
-        value: url,
-      }
-    ],
+  const config = new IoConfig()
+  await config.load()
+
+  const modal = await modalController.create({
+    component: IoConfigModal,
+    componentProps: {
+      config
+    }
   });
+  await modal.present();
 
-  await alert.present();
-  const {role, data} = await alert.onDidDismiss();
-  if (role !== 'destructive') {
-    return
+  const {data, role} = await modal.onWillDismiss();
+
+  if (role === 'confirm') {
+    await config.doStoreConfig(data as ImportExportConfig)
   }
-
-  await ImportExportUrl.set(data.values[0])
 }
 
 async function onPoemClick(poem: Poem) {
